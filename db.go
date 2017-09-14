@@ -15,9 +15,9 @@
 package goutils
 
 import (
-	"fmt"
-	"reflect"
-	"strings"
+	`fmt`
+	`reflect`
+	`strings`
 )
 
 // ObjectDbCols is a convenience method that returns relevant and valid
@@ -30,7 +30,7 @@ func ObjectDbCols(t interface{}, tid string) (cols []string, err error) {
 	v := reflect.ValueOf(t).Elem()
 
 	if v.Type().Kind() != reflect.Struct {
-		err = fmt.Errorf("kind %q is not %q", v.Type().Kind().String(), "struct")
+		err = fmt.Errorf(`kind %q is not %q`, v.Type().Kind().String(), `struct`)
 		return cols, err
 	}
 
@@ -96,7 +96,7 @@ func ObjectDbVals(t interface{}, tid string) (vals []interface{}, err error) {
 	v := reflect.ValueOf(t).Elem()
 
 	if v.Type().Kind() != reflect.Struct {
-		err = fmt.Errorf("kind %q is not %q", v.Type().Kind().String(), "struct")
+		err = fmt.Errorf(`kind %q is not %q`, v.Type().Kind().String(), `struct`)
 		return vals, err
 	}
 
@@ -133,7 +133,7 @@ func ObjectDbValsByCol(t interface{}, tid string, cols []string) (vals []interfa
 	v := reflect.ValueOf(t).Elem()
 
 	if v.Type().Kind() != reflect.Struct {
-		err = fmt.Errorf("kind %q is not %q", v.Type().Kind().String(), "struct")
+		err = fmt.Errorf(`kind %q is not %q`, v.Type().Kind().String(), `struct`)
 		return vals, err
 	}
 

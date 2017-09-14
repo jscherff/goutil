@@ -15,9 +15,9 @@
 package goutils
 
 import (
-	"fmt"
-	"runtime"
-	"path/filepath"
+	`fmt`
+	`runtime`
+	`path/filepath`
 )
 
 // ErrorDecorator prepends function filename, line number, and function name
@@ -38,7 +38,7 @@ func ErrorDecorator(err error) (error) {
 	frame, _ := frames.Next()
 
 	// Decorate error with caller information and return.
-	return fmt.Errorf("%s:%d: %s(): %v",
+	return fmt.Errorf(`%s:%d: %s(): %v`,
 		filepath.Base(frame.File),
 		frame.Line,
 		frame.Function,
