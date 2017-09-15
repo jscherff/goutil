@@ -1,10 +1,9 @@
 {
 	"Options": {
-		"RecoveryStack": false,
 		"LogFiles": {
-			"System": false,
+			"System": true,
 			"Access": false,
-			"Error": false
+			"Error": true
 		},
 		"Console": {
 			"System": false,
@@ -22,32 +21,33 @@
 			"Time": false,
 			"LongFile": false,
 			"ShortFile": false,
-			"Standard": false
+			"Standard": true
 		},
 		"UseFlags": {
-			"System": false,
+			"System": true,
 			"Access": false,
-			"Error": false
-		}
+			"Error": true
+		},
+		"RecoveryStack": false
 	},
 	"Config": {
 		"AppName": "",
-		"AppDir": "C:\\msys64\\home\\John\\go\\src\\github.com\\jscherff\\goutils\\test",
-		"LogDir": "C:\\msys64\\home\\John\\go\\src\\github.com\\jscherff\\goutils\\test\\log",
+		"AppDir": "",
+		"LogDir": "",
 		"LogFiles": {
-			"System": "",
-			"Access": "",
-			"Error": ""
+			"System": "system.log",
+			"Access": "access.log",
+			"Error": "error.log"
 		},
 		"LogFlags": {
-			"System": 0,
+			"System": 3,
 			"Access": 0,
-			"Error": 0
+			"Error": 3
 		},
 		"LogTags": {
-			"System": "",
-			"Access": "",
-			"Error": ""
+			"System": "system",
+			"Access": "access",
+			"Error": "error"
 		},
 		"Syslog": {
 			"Prot": "",

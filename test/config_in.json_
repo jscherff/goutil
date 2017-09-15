@@ -22,24 +22,26 @@
 			"Time": false,
 			"LongFile": false,
 			"ShortFile": false,
-			"Standard": true,
+			"Standard": true
+		},
+		"UseFlags": {
 			"System": true,
 			"Access": false,
-			"Error": true 
+			"Error": true
 		}
 	},
 	"Config": {
 		"AppName": "",
 		"AppDir": "C:\\msys64\\home\\John\\go\\src\\github.com\\jscherff\\goutils\\test",
-		"LogDir": "log",
+		"LogDir": "C:\\msys64\\home\\John\\go\\src\\github.com\\jscherff\\goutils\\test\\log",
 		"LogFiles": {
 			"System": "system.log",
 			"Access": "access.log",
 			"Error": "error.log"
 		},
 		"LogFlags": {
-			"System": 0,
-			"Access": 0,
+			"System": 3,
+			"Access": 3,
 			"Error": 0
 		},
 		"LogTags": {

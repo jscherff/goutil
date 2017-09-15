@@ -1,0 +1,9 @@
+error2017/09/15 10:13:02 hello
+error2017/09/15 10:36:15 hello
+hello again
+error:2017/09/15 10:40:29 hello
+hello again
+error: 2017/09/15 10:41:43 hello
+hello again
+error 2017/09/15 10:43:38 main.go:18: hello
+hello again
