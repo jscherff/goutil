@@ -23,12 +23,6 @@ import (
 	`os`
 )
 
-const (
-	LogFileFlags = os.O_APPEND|os.O_CREATE|os.O_WRONLY
-	LogFileMode = 0644
-	LogDirMode = 0755
-)
-
 // MultiWriter is an io.Writer that sends output to multiple destinations.
 type MultiWriter struct {
 	writers  []io.Writer
@@ -52,9 +46,9 @@ func (this *MultiWriter) AddFile(f string) {
 	var err error
 	var h *os.File
 
-	if err = os.MkdirAll(filepath.Dir(f), LogDirMode); err == nil {
+	if err = os.MkdirAll(filepath.Dir(f), DirMode); err == nil {
 
-		if h, err = os.OpenFile(f, LogFileFlags, LogFileMode); err == nil {
+		if h, err = os.OpenFile(f, FileFlags, FileMode); err == nil {
 			this.files = append(this.files, h)
 		}
 	}
