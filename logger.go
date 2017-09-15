@@ -15,16 +15,18 @@
 package goutils
 
 import (
+	`bufio`
+	`encoding/json`
 	`log`
 	`io`
 	`io/ioutil`
 	`os`
+	`path/filepath`
 	`strings`
 	`github.com/RackSec/srslog`
-	`github.com/jscherff/goutils`
 )
 
-type MultiLogger struct {
+type MultiLoggerWriter struct {
 
 	logFlags int
 	isLocked bool
@@ -33,6 +35,18 @@ type MultiLogger struct {
 		System *log.Logger
 		Access *log.Logger
 		Error *log.Logger
+	}
+
+	writers struct {
+		System io.Writer
+		Access io.Writer
+		Error io.Writer
+	}
+
+	bufWriters struct {
+		System io.Writer
+		Access io.Writer
+		Error io.Writer
 	}
 
 	Options struct {
@@ -64,6 +78,9 @@ type MultiLogger struct {
 			LongFile bool
 			ShortFile bool
 			Standard bool
+			System bool
+			Access bool
+			Error bool
 		}
 	}
 
@@ -80,22 +97,28 @@ type MultiLogger struct {
 			Error string
 		}
 
+		LogFlags struct {
+			System int
+			Access int
+			Error int
+		}
+
+		LogTags struct {
+			System string
+			Access string
+			Error string
+		}
+
 		Syslog struct {
 			Prot string
 			Host string
 			Port string
 			Tag string
 		}
-
-		Tags struct {
-			System string
-			Access string
-			Error string
-		}
 	}
 }
 
-func NewMultiLogger(cf ...string) (this *MultiLogger, err error) {
+func NewMultiLoggerWriter(cf ...string) (this *MultiLoggerWriter, err error) {
 
 	if len(cf) != 0 {
 
@@ -107,35 +130,45 @@ func NewMultiLogger(cf ...string) (this *MultiLogger, err error) {
 
 		defer fh.Close()
 
-		this = &MultiLogger{}
+		this = &MultiLoggerWriter{}
 		jd := json.NewDecoder(fh)
 		err = jd.Decode(&this)
 
 	} else {
 
-		return &MultiLogger{}, nil
+		return &MultiLoggerWriter{}, nil
 	}
 
 	return this, err
 }
 
-func (this *MultiLogger) Init() (err error) {
-
-	this.isLocked = true
+func (this *MultiLoggerWriter) Init() {
 
 	var (
 		sw, aw, ew []io.Writer
+
 		slProt = this.Config.Syslog.Prot
 		slHost = this.Config.Syslog.Host
 		slPort = this.Config.Syslog.Port
 		slTag = this.Config.Syslog.Tag
-		slRaddr = strings.Join([]string{slAddr, slPort}, `:`)
+		slRaddr = strings.Join([]string{slHost, slPort}, `:`)
 	)
+
+	this.isLocked = true
+	this.Config.AppDir = filepath.Dir(os.Args[0])
+
+	if len(this.Config.LogDir) == 0 {
+		this.Config.LogDir = `log`
+	}
+
+	if filepath.Dir(this.Config.LogDir) == `.` {
+		this.Config.LogDir = filepath.Join(this.Config.AppDir, this.Config.LogDir)
+	}
 
 	var newfl = func(f string) (h *os.File, err error) {
 
 		if h, err = os.OpenFile(f, FileFlags, FileMode); err != nil {
-			log.Printf(`%v`, goutils.ErrorDecorator(err))
+			log.Printf(`%v`, ErrorDecorator(err))
 		}
 
 		return h, err
@@ -144,7 +177,7 @@ func (this *MultiLogger) Init() (err error) {
 	var newsl = func(p srslog.Priority) (s *srslog.Writer, err error) {
 
 		if s, err = srslog.Dial(slProt, slRaddr, p, slTag); err != nil {
-			log.Printf(`%v`, goutils.ErrorDecorator(err))
+			log.Printf(`%v`, ErrorDecorator(err))
 		}
 
 		return s, err
@@ -152,238 +185,376 @@ func (this *MultiLogger) Init() (err error) {
 
 	switch true {
 
-	this.Options.LogFiles.System:
-		if f, err := newfl(conf.Config.LogFiles.System); err == nil {
+	case this.Options.LogFiles.System:
+		if f, err := newfl(this.Config.LogFiles.System); err == nil {
 			sw = append(sw, f)
 		}
 		fallthrough
 
-	this.Options.LogFiles.Access:
-		if f, err := newfl(conf.Config.LogFiles.Access); err == nil {
+	case this.Options.LogFiles.Access:
+		if f, err := newfl(this.Config.LogFiles.Access); err == nil {
 			aw = append(aw, f)
 		}
 		fallthrough
 
-	this.Options.LogFiles.Error:
-		if f, err := newfl(conf.Config.LogFiles.Error); err == nil {
+	case this.Options.LogFiles.Error:
+		if f, err := newfl(this.Config.LogFiles.Error); err == nil {
 			ew = append(ew, f)
 		}
 		fallthrough
 
-	this.Options.Console.System:
+	case this.Options.Console.System:
 		sw = append(sw, os.Stdout)
 		fallthrough
 
-	this.Options.Console.Access:
+	case this.Options.Console.Access:
 		aw = append(aw, os.Stdout)
 		fallthrough
 
-	this.Options.Console.Error:
+	case this.Options.Console.Error:
 		ew = append(ew, os.Stderr)
 		fallthrough
 
-	this.Options.Syslog.System:
-		if s, err := newsl(PriInfo); err == nil {
+	case this.Options.Syslog.System:
+		if s, err := newsl(SyslogPriInfo); err == nil {
 			sw = append(sw, s)
 		}
 		fallthrough
 
-	this.Options.Syslog.Access:
-		if s, err := newsl(PriInfo); err == nil {
-			cw = append(aw, s)
+	case this.Options.Syslog.Access:
+		if s, err := newsl(SyslogPriInfo); err == nil {
+			aw = append(aw, s)
 		}
 		fallthrough
 
-	this.Options.Syslog.Error:
-		if s, err := newsl(PriErr); err == nil {
+	case this.Options.Syslog.Error:
+		if s, err := newsl(SyslogPriErr); err == nil {
 			ew = append(ew, s)
 		}
-	}
 
-	len(sw) == 0:
+	case len(sw) == 0:
 		sw = append(sw, ioutil.Discard)
 		fallthrough
 
-	len(cw) == 0:
-		aw = append(cw, ioutil.Discard)
+	case len(aw) == 0:
+		aw = append(aw, ioutil.Discard)
 		fallthrough
 
-	len(ew) == 0:
+	case len(ew) == 0:
 		ew = append(ew, ioutil.Discard)
 	}
 
-	// Configure log flags.
+	// Configure log flag options.
 
-	switch true {
+	switch {
 
-	this.Config.LogFlags.Standard:
+	case this.Options.LogFlags.Standard:
 		this.logFlags |= log.LstdFlags
 		break
 
-	this.Config.LogFlags.UTC:
+	case this.Options.LogFlags.UTC:
 		this.logFlags |= log.LUTC
 		fallthrough
 
-	this.Config.LogFlags.Date:
+	case this.Options.LogFlags.Date:
 		this.logFlags |= log.Ldate
 		fallthrough
 
-	this.Config.LogFlags.Time:
+	case this.Options.LogFlags.Time:
 		this.logFlags |= log.Ltime
 		fallthrough
 
-	this.Config.LogFlags.ShortFile:
+	case this.Options.LogFlags.ShortFile:
 		this.logFlags |= log.Lshortfile
 		break
 
-	this.Config.LogFlags.LongFile:
+	case this.Options.LogFlags.LongFile:
 		this.logFlags |= log.Llongfile
 
 	}
 
-	this.System = log.New(io.MultiWriter(sw...), this.Config.Flags.System, this.logFlags)
-	this.Access = log.New(io.MultiWriter(aw...), this.Config.Flags.Access, this.logFlags)
-	this.Error = log.New(io.MultiWriter(ew...), this.Config.Flags.Error, this.logFlags)
-}
+	this.Config.LogFlags.System = this.logFlags
+	this.Config.LogFlags.Access = this.logFlags
+	this.Config.LogFlags.Error = this.logFlags
 
-func (this *MultiLogger) EnableConsole(opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.Console.System = opt
-	this.Options.Console.Access = opt
-	this.Options.Console.Error = opt
-}
+	switch {
 
-func (this *MultiLogger) EnableLogFiles (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.LogFiles.System = opt
-	this.Options.LogFiles.Access = opt
-	this.Options.LogFiles.Error = opt
-}
+	case !this.Options.LogFlags.System:
+		this.Config.LogFlags.System = 0
+		fallthrough
 
-func (this *MultiLogger) EnableSyslog (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.Syslog.System = opt
-	this.Options.Syslog.Access = opt
-	this.Options.Syslog.Error = opt
-}
+	case !this.Options.LogFlags.Access:
+		this.Config.LogFlags.Access= 0
+		fallthrough
 
-func (this *MultiLogger) EnableSystem (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.LogFiles.System = opt
-	this.Options.Console.System = opt
-	this.Options.Syslog.System = opt
-}
-
-func (this *MultiLogger) EnableAccess (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.LogFiles.Access = opt
-	this.Options.Console.Access = opt
-	this.Options.Syslog.Access = opt
-}
-
-func (this *MultiLogger) EnableAccess (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.LogFiles.Error = opt
-	this.Options.Console.Error = opt
-	this.Options.Syslog.Error = opt
-}
-
-func (this *MultiLogger) FlagsUTC (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.Flags.UTC= opt
-}
-
-func (this *MultiLogger) FlagsDate (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.Flags.Date= opt
-}
-
-func (this *MultiLogger) FlagsTime (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.Flags.Time = opt
-}
-
-func (this *MultiLogger) FlagsLongFile (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	if opt {this.Options.Flags.ShortFile = false}
-	this.Options.Flags.LongFile = opt
-}
-
-func (this *MultiLogger) FlagsShortFile (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	if opt {this.Options.Flags.LongFile = false}
-	this.Options.Flags.ShortFile = opt
-}
-
-func (this *MultiLogger) FlagsStandard (opt bool) *MultiLogger {
-	if this.isLocked {panic(`configuration isLocked`)}
-	if opt {
-		this.Options.Flags.UTC = false
-		this.Options.Flags.Date = false
-		this.Options.Flags.Time = false
-		this.Options.Flags.LongFile = false
-		this.Options.Flags.ShortFile = false
+	case !this.Options.LogFlags.Error:
+		this.Config.LogFlags.Error = 0
 	}
-	this.Options.Flags.Standard = opt
+
+	this.writers.System = io.MultiWriter(sw...)
+	this.writers.Access = io.MultiWriter(aw...)
+	this.writers.Error = io.MultiWriter(ew...)
+
+	this.bufWriters.System = bufio.NewWriter(this.writers.System)
+	this.bufWriters.Access = bufio.NewWriter(this.writers.Access)
+	this.bufWriters.Error = bufio.NewWriter(this.writers.Error)
+
+	this.loggers.System = log.New(
+		this.writers.System,
+		this.Config.LogTags.System,
+		this.Config.LogFlags.System,
+	)
+
+	this.loggers.Access = log.New(
+		this.writers.Access,
+		this.Config.LogTags.Access,
+		this.Config.LogFlags.Access,
+	)
+
+	this.loggers.Error = log.New(
+		this.writers.Error,
+		this.Config.LogTags.Error,
+		this.Config.LogFlags.Error,
+	)
 }
 
-func (this *MultiLogger) RecoveryStack (opt bool) *MultiLogger {
+func (this *MultiLoggerWriter) SaveConfig(cf string) (err error) {
+
+	fh, err := os.Create(cf)
+
+	if err != nil {
+		return err
+	}
+
+	defer fh.Close()
+
+	je := json.NewEncoder(fh)
+	je.SetIndent("", "\t")
+	err = je.Encode(&this)
+
+	return err
+}
+
+// Getters for Writers.
+
+func (this *MultiLoggerWriter) SystemWriter() io.Writer {
+	return this.writers.System
+}
+
+func (this *MultiLoggerWriter) AccessWriter() io.Writer {
+	return this.writers.Access
+}
+
+func (this *MultiLoggerWriter) ErrorWriter() io.Writer {
+	return this.writers.Error
+}
+
+// Getters for BufWriters.
+
+func (this *MultiLoggerWriter) SystemBufWriter() io.Writer {
+	return this.bufWriters.System
+}
+
+func (this *MultiLoggerWriter) AccessBufWriter() io.Writer {
+	return this.bufWriters.Access
+}
+
+func (this *MultiLoggerWriter) ErrorBufWriter() io.Writer {
+	return this.bufWriters.Error
+}
+
+// Getters for Loggers.
+
+func (this *MultiLoggerWriter) SystemLogger() *log.Logger {
+	return this.loggers.System
+}
+
+func (this *MultiLoggerWriter) AccessLogger() *log.Logger {
+	return this.loggers.Access
+}
+
+func (this *MultiLoggerWriter) ErrorLogger() *log.Logger {
+	return this.loggers.Error
+}
+
+// Setters.
+
+func (this *MultiLoggerWriter) EnableConsole(b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Options.RecoveryStack = opt
+	this.Options.Console.System = b
+	this.Options.Console.Access = b
+	this.Options.Console.Error = b
+	return this
 }
 
-func (this *MultiLogger) LogDir (dn string) *MultiLogger {
+func (this *MultiLoggerWriter) EnableLogFiles (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.LogDir = fn
+	this.Options.LogFiles.System = b
+	this.Options.LogFiles.Access = b
+	this.Options.LogFiles.Error = b
+	return this
 }
 
-func (this *MultiLogger) SystemLog (fn string) *MultiLogger {
+func (this *MultiLoggerWriter) EnableSyslog (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.LogFiles.System = fn
+	this.Options.Syslog.System = b
+	this.Options.Syslog.Access = b
+	this.Options.Syslog.Error = b
+	return this
 }
 
-func (this *MultiLogger) AccessLog (fn string) *MultiLogger {
+func (this *MultiLoggerWriter) EnableSystem (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.LogFiles.Access = fn
+	this.Options.LogFiles.System = b
+	this.Options.Console.System = b
+	this.Options.Syslog.System = b
+	return this
 }
 
-func (this *MultiLogger) ErrorLog (fn string) *MultiLogger {
+func (this *MultiLoggerWriter) EnableAccess (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.LogFiles.Error = fn
+	this.Options.LogFiles.Access = b
+	this.Options.Console.Access = b
+	this.Options.Syslog.Access = b
+	return this
 }
 
-func (this *MultiLogger) SyslogProt (val string) *MultiLogger {
+func (this *MultiLoggerWriter) EnableError (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.Syslog.Protcol = val
+	this.Options.LogFiles.Error = b
+	this.Options.Console.Error = b
+	this.Options.Syslog.Error = b
+	return this
 }
 
-func (this *MultiLogger) SyslogHost (val string) *MultiLogger {
+func (this *MultiLoggerWriter) SystemLogFlags (b bool) *MultiLoggerWriter {
+	this.Options.LogFlags.System = b
+	return this
+}
+
+func (this *MultiLoggerWriter) AccessLogFlags (b bool) *MultiLoggerWriter {
+	this.Options.LogFlags.Access = b
+	return this
+}
+
+func (this *MultiLoggerWriter) ErrorLogFlags (b bool) *MultiLoggerWriter {
+	this.Options.LogFlags.Error = b
+	return this
+}
+
+func (this *MultiLoggerWriter) FlagsUTC (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.Syslog.Host = val
+	this.Options.LogFlags.UTC = b
+	return this
 }
 
-func (this *MultiLogger) SyslogPort (val string) *MultiLogger {
+func (this *MultiLoggerWriter) FlagsDate (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.Syslog.Port = val
+	this.Options.LogFlags.Date = b
+	return this
 }
 
-func (this *MultiLogger) SyslogTag (val string) *MultiLogger {
+func (this *MultiLoggerWriter) FlagsTime (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.Syslog.Tag = val
+	this.Options.LogFlags.Time = b
+	return this
 }
 
-func (this *MultiLogger) SystemPrefix (val string) *MultiLogger {
+func (this *MultiLoggerWriter) FlagsLongFile (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.Prefix.System = val
+	if b {this.Options.LogFlags.ShortFile = false}
+	this.Options.LogFlags.LongFile = b
+	return this
 }
 
-func (this *MultiLogger) AccessPrefix (val string) *MultiLogger {
+func (this *MultiLoggerWriter) FlagsShortFile (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.Prefix.Access = val
+	if b {this.Options.LogFlags.LongFile = false}
+	this.Options.LogFlags.ShortFile = b
+	return this
 }
 
-func (this *MultiLogger) ErrorPrefix (val string) *MultiLogger {
+func (this *MultiLoggerWriter) FlagsStandard (b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration isLocked`)}
-	this.Config.Prefix.System = val
+	if b {
+		this.Options.LogFlags.UTC = false
+		this.Options.LogFlags.Date = false
+		this.Options.LogFlags.Time = false
+		this.Options.LogFlags.LongFile = false
+		this.Options.LogFlags.ShortFile = false
+	}
+	this.Options.LogFlags.Standard = b
+	return this
 }
 
+func (this *MultiLoggerWriter) RecoveryStack (b bool) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Options.RecoveryStack = b
+	return this
+}
+
+func (this *MultiLoggerWriter) LogDir (d string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.LogDir = d
+	return this
+}
+
+func (this *MultiLoggerWriter) SystemLog (f string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.LogFiles.System = f
+	return this
+}
+
+func (this *MultiLoggerWriter) AccessLog (f string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.LogFiles.Access = f
+	return this
+}
+
+func (this *MultiLoggerWriter) ErrorLog (f string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.LogFiles.Error = f
+	return this
+}
+
+func (this *MultiLoggerWriter) SyslogProt (v string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.Syslog.Prot = v
+	return this
+}
+
+func (this *MultiLoggerWriter) SyslogHost (v string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.Syslog.Host = v
+	return this
+}
+
+func (this *MultiLoggerWriter) SyslogPort (v string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.Syslog.Port = v
+	return this
+}
+
+func (this *MultiLoggerWriter) SyslogTag (v string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.Syslog.Tag = v
+	return this
+}
+
+func (this *MultiLoggerWriter) SystemTag (v string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.LogTags.System = v
+	return this
+}
+
+func (this *MultiLoggerWriter) AccessTag (v string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.LogTags.Access = v
+	return this
+}
+
+func (this *MultiLoggerWriter) ErrorTag (v string) *MultiLoggerWriter {
+	if this.isLocked {panic(`configuration isLocked`)}
+	this.Config.LogTags.System = v
+	return this
+}
