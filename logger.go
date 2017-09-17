@@ -48,6 +48,12 @@ type MultiLoggerWriter struct {
 		Error io.Writer
 	}
 
+	syslogs struct {
+		System *srslog.Writer
+		Access *srslog.Writer
+		Error *srslog.Writer
+	}
+
 	Options struct {
 
 		LogFiles struct {
@@ -68,6 +74,12 @@ type MultiLoggerWriter struct {
 			Error bool
 		}
 
+		UseFlags struct {
+			System bool
+			Access bool
+			Error bool
+		}
+
 		LogFlags struct {
 			UTC bool
 			Date bool
@@ -75,12 +87,6 @@ type MultiLoggerWriter struct {
 			LongFile bool
 			ShortFile bool
 			Standard bool
-		}
-
-		UseFlags struct {
-			System bool
-			Access bool
-			Error bool
 		}
 
 		RecoveryStack bool
