@@ -46,9 +46,9 @@ func (this *MultiWriter) AddFile(f string) {
 	var err error
 	var h *os.File
 
-	if err = os.MkdirAll(filepath.Dir(f), DirMode); err == nil {
+	if err = os.MkdirAll(filepath.Dir(f), DirModeDefault); err == nil {
 
-		if h, err = os.OpenFile(f, FileFlags, FileMode); err == nil {
+		if h, err = os.OpenFile(f, FileFlagsAppend, FileModeDefault); err == nil {
 			this.files = append(this.files, h)
 		}
 	}

@@ -15,18 +15,13 @@
 package goutil
 
 import (
-	`log`
 	`os`
-	`github.com/RackSec/srslog`
+	`path/filepath`
 )
 
-const (
-	SyslogPriInfo = srslog.LOG_LOCAL7|srslog.LOG_INFO
-	SyslogPriErr = srslog.LOG_LOCAL7|srslog.LOG_ERR
-
-	FileFlagsAppend = os.O_APPEND|os.O_CREATE|os.O_WRONLY
-	FileModeDefault = 0640
-	DirModeDefault = 0750
-
-	LoggerFlags = log.LstdFlags
-)
+func MkdirOpen(fn string) (*os.File, error) {
+	if err := os.MkdirAll(filepath.Dir(fn), DirModeDefault); err != nil {
+		return nil, err
+	}
+	return os.OpenFile(fn, FileFlagsAppend, FileModeDefault)
+}

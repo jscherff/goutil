@@ -80,7 +80,7 @@ type MultiLoggerWriter struct {
 			Error bool
 		}
 
-		LogFlags struct {
+		LoggerFlags struct {
 			UTC bool
 			Date bool
 			Time bool
@@ -105,7 +105,7 @@ type MultiLoggerWriter struct {
 			Error string
 		}
 
-		LogFlags struct {
+		LoggerFlags struct {
 			System int
 			Access int
 			Error int
@@ -172,7 +172,7 @@ func (this *MultiLoggerWriter) Init() *MultiLoggerWriter {
 
 	var newfl = func(f string) (h *os.File, err error) {
 
-		if h, err = os.OpenFile(f, FileFlags, FileMode); err != nil {
+		if h, err = os.OpenFile(f, FileFlagsAppend, FileModeDefault); err != nil {
 			log.Printf(`%v`, ErrorDecorator(err))
 		}
 
@@ -251,44 +251,44 @@ func (this *MultiLoggerWriter) Init() *MultiLoggerWriter {
 
 	// Configure log flag options.
 
-	this.Config.LogFlags.System = 0
-	this.Config.LogFlags.Access = 0
-	this.Config.LogFlags.Error = 0
+	this.Config.LoggerFlags.System = 0
+	this.Config.LoggerFlags.Access = 0
+	this.Config.LoggerFlags.Error = 0
 
-	if this.Options.LogFlags.Standard {
+	if this.Options.LoggerFlags.Standard {
 		lFlags = log.LstdFlags
 	}
 
-	if this.Options.LogFlags.UTC {
+	if this.Options.LoggerFlags.UTC {
 		lFlags |= log.LUTC
 	}
 
-	if this.Options.LogFlags.Date {
+	if this.Options.LoggerFlags.Date {
 		lFlags |= log.Ldate
 	}
 
-	if this.Options.LogFlags.Time {
+	if this.Options.LoggerFlags.Time {
 		lFlags |= log.Ltime
 	}
 
-	if this.Options.LogFlags.ShortFile {
+	if this.Options.LoggerFlags.ShortFile {
 		lFlags |= log.Lshortfile
 	}
 
-	if this.Options.LogFlags.LongFile {
+	if this.Options.LoggerFlags.LongFile {
 		lFlags |= log.Llongfile
 	}
 
 	if this.Options.UseFlags.System {
-		this.Config.LogFlags.System = lFlags
+		this.Config.LoggerFlags.System = lFlags
 	}
 
 	if this.Options.UseFlags.Access {
-		this.Config.LogFlags.Access = lFlags
+		this.Config.LoggerFlags.Access = lFlags
 	}
 
 	if this.Options.UseFlags.Error {
-		this.Config.LogFlags.Error = lFlags
+		this.Config.LoggerFlags.Error = lFlags
 	}
 
 	// Create io.Writers
@@ -312,19 +312,19 @@ func (this *MultiLoggerWriter) Init() *MultiLoggerWriter {
 	this.loggers.System = log.New(
 		this.writers.System,
 		this.Config.LogTags.System,
-		this.Config.LogFlags.System,
+		this.Config.LoggerFlags.System,
 	)
 
 	this.loggers.Access = log.New(
 		this.writers.Access,
 		this.Config.LogTags.Access,
-		this.Config.LogFlags.Access,
+		this.Config.LoggerFlags.Access,
 	)
 
 	this.loggers.Error = log.New(
 		this.writers.Error,
 		this.Config.LogTags.Error,
-		this.Config.LogFlags.Error,
+		this.Config.LoggerFlags.Error,
 	)
 
 	return this
@@ -464,39 +464,39 @@ func (this *MultiLoggerWriter) ErrorUseFlags(b bool) *MultiLoggerWriter {
 
 func (this *MultiLoggerWriter) FlagsUTC(b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration is locked`)}
-	this.Options.LogFlags.UTC = b
+	this.Options.LoggerFlags.UTC = b
 	return this
 }
 
 func (this *MultiLoggerWriter) FlagsDate(b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration is locked`)}
-	this.Options.LogFlags.Date = b
+	this.Options.LoggerFlags.Date = b
 	return this
 }
 
 func (this *MultiLoggerWriter) FlagsTime(b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration is locked`)}
-	this.Options.LogFlags.Time = b
+	this.Options.LoggerFlags.Time = b
 	return this
 }
 
 func (this *MultiLoggerWriter) FlagsLongFile(b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration is locked`)}
-	if b {this.Options.LogFlags.ShortFile = false}
-	this.Options.LogFlags.LongFile = b
+	if b {this.Options.LoggerFlags.ShortFile = false}
+	this.Options.LoggerFlags.LongFile = b
 	return this
 }
 
 func (this *MultiLoggerWriter) FlagsShortFile(b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration is locked`)}
-	if b {this.Options.LogFlags.LongFile = false}
-	this.Options.LogFlags.ShortFile = b
+	if b {this.Options.LoggerFlags.LongFile = false}
+	this.Options.LoggerFlags.ShortFile = b
 	return this
 }
 
 func (this *MultiLoggerWriter) FlagsStandard(b bool) *MultiLoggerWriter {
 	if this.isLocked {panic(`configuration is locked`)}
-	this.Options.LogFlags.Standard = b
+	this.Options.LoggerFlags.Standard = b
 	return this
 }
 
@@ -653,7 +653,7 @@ func (this *MultiLoggerWriter) DefaultsInit() *MultiLoggerWriter {
 			"Access": false,
 			"Error": false
 		},
-		"LogFlags": {
+		"LoggerFlags": {
 			"UTC": false,
 			"Date": false,
 			"Time": false,
@@ -677,7 +677,7 @@ func (this *MultiLoggerWriter) DefaultsInit() *MultiLoggerWriter {
 			"Access": "access.log",
 			"Error": "error.log"
 		},
-		"LogFlags": {
+		"LoggerFlags": {
 			"System": 3,
 			"Access": 0,
 			"Error": 3
