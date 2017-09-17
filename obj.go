@@ -156,7 +156,11 @@ func CompareObjects(t1, t2 interface{}, tid string) (ss[][]string, err error) {
 // functions.
 func ObjecToSlice(t interface{}, tid string) (ss[][]string, err error) {
 
-	v := reflect.ValueOf(t).Elem()
+	var v reflect.Value
+
+	if v = reflect.ValueOf(t); v.Type().Kind() != reflect.Struct {
+		v = reflect.ValueOf(t).Elem()
+	}
 
 	if v.Type().Kind() != reflect.Struct {
 		err = fmt.Errorf(`kind %q is not %q`, v.Type().Kind().String(), `struct`)
