@@ -45,26 +45,3 @@ func ErrorDecorator(err error) (error) {
 		err,
 	)
 }
-
-// PrintLine prints the line on which the caller executes it.
-func PrintLine() {
-
-	// Need space only for PC of caller.
-	pc := make([]uintptr, 1)
-
-	// Skip PC of Callers and decorator function.
-	n := runtime.Callers(2, pc)
-
-	// Return if no PCs available.
-	if n == 0 { return }
-
-	// Obtain the caller frame.
-	frames := runtime.CallersFrames(pc[:n])
-	frame, _ := frames.Next()
-
-	// Print file and line number, then return.
-	fmt.Printf("%s:%d\n",
-		filepath.Base(frame.File),
-		frame.Line,
-	)
-}
