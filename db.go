@@ -15,6 +15,7 @@
 package goutil
 
 import (
+	`database/sql`
 	`fmt`
 	`reflect`
 	`strings`
@@ -162,4 +163,45 @@ func ObjectDbValsByCol(t interface{}, tid string, cols []string) (vals []interfa
 	}
 
 	return vals, err
+}
+
+// RowToMap converts a database row into a map of string values indexed
+// by column name.
+func RowToMap(vid, pid, sn string, rows *sql.Rows) (mss map[string]string, err error) {
+
+	var cols []string
+
+	if cols, err = rows.Columns(); err != nil {
+		return nil, err
+	}
+
+	for rows.Next() {
+
+		vals := make([]interface{}, len(cols))
+		pvals := make([]interface{}, len(cols))
+
+		for i, _ := range vals {
+			pvals[i] = &vals[i]
+		}
+
+		if err = rows.Scan(pvals...); err != nil {
+			return nil, err
+		}
+
+		mss = make(map[string]string)
+
+		for i, cn := range cols {
+			if b, ok := vals[i].([]byte); ok {
+				mss[cn] = string(b)
+			} else {
+				mss[cn] = fmt.Sprintf(`%v`, vals[i])
+			}
+		}
+	}
+
+	if rows.Err() != nil {
+		err = rows.Err()
+	}
+
+	return mss, err
 }
